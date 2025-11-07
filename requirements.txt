@@ -1,0 +1,19 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+numpy
+torch      # install correct CUDA wheel if you have GPU
+transformers>=4.30.0
+sentencepiece
+whisper
+ultralytics
+opencv-python
+tqdm
+aiofiles
+
+# New for Step-2
+segment-anything       # SAM (segment-anything pip package)
+easyocr                # OCR
+ftfy                   # text tidy used by easyocr/clipping
+scikit-learn

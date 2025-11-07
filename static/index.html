@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Multimodal Assistant — Demo UI</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+    .col { display:flex; gap:20px; flex-wrap: wrap; }
+    .panel { border:1px solid #ddd; padding:12px; border-radius:6px; width:48%; min-width:350px; }
+    img { max-width:100%; height:auto; }
+    .small { font-size:0.9rem; color:#555; }
+  </style>
+</head>
+<body>
+  <h2>🧠 Multimodal Assistant — Step 2 Demo</h2>
+
+  <div class="col">
+    <!-- Upload Panel -->
+    <div class="panel">
+      <h3>1️⃣ Upload Image</h3>
+      <input id="imgfile" type="file" accept="image/*"/><br/><br/>
+      <button id="uploadBtn">Upload</button>
+      <p id="uploadStatus" class="small"></p>
+      <div id="origImg"></div>
+    </div>
+
+    <!-- Ask Panel -->
+    <div class="panel">
+      <h3>2️⃣ Ask a Question (Text or Voice)</h3>
+      <input id="imageId" placeholder="image_id from upload" style="width:100%"/><br/><br/>
+
+      <div>
+        <strong>Text Question:</strong><br/>
+        <input id="question" placeholder="Type question e.g. How many people? What are they wearing?" style="width:100%"/>
+        <button id="askTextBtn">Ask (Text)</button>
+      </div>
+
+      <hr/>
+
+      <div>
+        <strong>Voice Question:</strong><br/>
+        <button id="startRec">🎙️ Start Recording</button>
+        <button id="stopRec" disabled>⏹️ Stop</button>
+        <p id="recStatus" class="small"></p>
+      </div>
+
+      <p id="answer" class="small"></p>
+      <audio id="audioPlayer" controls style="display:none; margin-top:10px;"></audio>
+      <div id="annotated"></div>
+    </div>
+  </div>
+
+  <script>
+  const backend = window.location.origin; // http://127.0.0.1:8000
+
+  const uploadBtn = document.getElementById("uploadBtn");
+  const imgfile = document.getElementById("imgfile");
+  const uploadStatus = document.getElementById("uploadStatus");
+  const origImg = document.getElementById("origImg");
+  const imageIdInput = document.getElementById("imageId");
+  const questionInput = document.getElementById("question");
+  const askTextBtn = document.getElementById("askTextBtn");
+  const answerEl = document.getElementById("answer");
+  const annotatedEl = document.getElementById("annotated");
+  const audioPlayer = document.getElementById("audioPlayer");
+
+  // ---------- IMAGE UPLOAD ----------
+  uploadBtn.onclick = async () => {
+    if (!imgfile.files.length) { alert("Select an image first"); return; }
+    const f = imgfile.files[0];
+    const form = new FormData();
+    form.append("file", f);
+    uploadStatus.innerText = "Uploading...";
+
+    const res = await fetch(backend + "/api/upload_image", { method: "POST", body: form });
+
+    const j = await res.json();
+
+    if (j.status === "ok") {
+      uploadStatus.innerText = "✅ Uploaded: " + j.image_id;
+      imageIdInput.value = j.image_id;
+      origImg.innerHTML = `<img src="${backend}/api/image/${j.image_id}" />`;
+
+    } else {
+      uploadStatus.innerText = "❌ Upload failed: " + (j.message || JSON.stringify(j));
+    }
+  };
+
+  // ---------- TEXT QUESTION ----------
+  askTextBtn.onclick = async () => {
+    const image_id = imageIdInput.value.trim();
+    const q = questionInput.value.trim();
+    if (!image_id || !q) { alert("Provide both image_id and question"); return; }
+    answerEl.innerText = "Thinking...";
+
+    const form = new FormData();
+    form.append("image_id", image_id);
+    form.append("text", q);
+    const res = await fetch(backend + "/api/ask", { method: "POST", body: form });
+
+    const j = await res.json();
+
+    if (j.status === "ok") {
+      answerEl.innerText = "💬 Answer: " + j.answer;
+      if (j.tts_url) {
+        audioPlayer.src = j.tts_url;
+        audioPlayer.style.display = "block";
+        audioPlayer.play().catch(()=>{});
+      }
+      if (j.metadata?.annotated_path) {
+        annotatedEl.innerHTML = `<img src="${backend}/annotated/${image_id.replace(/\.[^/.]+$/, '')}_annotated.jpg" />`;
+      }
+    } else {
+      answerEl.innerText = "❌ Error: " + (j.message || JSON.stringify(j));
+    }
+  };
+
+  // ---------- VOICE RECORDING ----------
+  let mediaRecorder;
+  let audioChunks = [];
+  const startRec = document.getElementById("startRec");
+  const stopRec = document.getElementById("stopRec");
+  const recStatus = document.getElementById("recStatus");
+
+  startRec.onclick = async () => {
+    const image_id = imageIdInput.value.trim();
+    if (!image_id) { alert("Enter image_id first"); return; }
+    if (!navigator.mediaDevices) { alert("Media devices not supported"); return; }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const form = new FormData();
+      form.append("image_id", image_id);
+      form.append("audio", new File([blob], "question.webm"));
+      answerEl.innerText = "Processing audio...";
+
+      const res = await fetch(backend + "/api/ask", { method: "POST", body: form });
+
+      const j = await res.json();
+
+      if (j.status === "ok") {
+        answerEl.innerText = "🎧 Answer: " + j.answer;
+        if (j.tts_url) {
+          audioPlayer.src = j.tts_url;
+          audioPlayer.style.display = "block";
+          audioPlayer.play().catch(()=>{});
+        }
+        if (j.metadata?.annotated_path) {
+          annotatedEl.innerHTML = `<img src="${backend}/annotated/${image_id.replace(/\.[^/.]+$/, '')}_annotated.jpg" />`;
+        }
+      } else {
+        answerEl.innerText = "❌ Error: " + (j.message || JSON.stringify(j));
+      }
+    };
+
+    mediaRecorder.start();
+    startRec.disabled = true;
+    stopRec.disabled = false;
+    recStatus.innerText = "Recording... Click Stop when done.";
+  };
+
+  stopRec.onclick = () => {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+      startRec.disabled = false;
+      stopRec.disabled = true;
+      recStatus.innerText = "Processing...";
+    }
+  };
+  </script>
+</body>
+</html>

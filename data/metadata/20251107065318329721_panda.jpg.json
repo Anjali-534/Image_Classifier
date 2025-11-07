@@ -1,0 +1,18 @@
+{
+  "filename": "20251107065318329721_panda.jpg",
+  "caption": "panda eating bamboo - screenshoto",
+  "person_count": 0,
+  "detection_boxes": [
+    {
+      "label": "bird",
+      "conf": 0.27930355072021484,
+      "bbox": [
+        246.6619415283203,
+        12.753161430358887,
+        753.9275512695312,
+        470.6053466796875
+      ]
+    }
+  ],
+  "annotated_path": "data\\annotated\\20251107065318329721_panda_annotated.jpg"
+}

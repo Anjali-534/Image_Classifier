@@ -8,7 +8,8 @@ import uvicorn
 from PIL import Image
 import cv2
 import numpy as np
-
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 # --- Local imports ---
 from .models_loader import load_all
 from .utils import save_image, save_audio, save_metadata, load_metadata, IMAGES_DIR
@@ -28,12 +29,14 @@ print("✅ Models loaded successfully!")
 # ----------------------------
 # STATIC UI
 # ----------------------------
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
+
 if STATIC_DIR.exists():
-    app.mount("/ui", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+    print(f"✅ Serving frontend from: {STATIC_DIR}")
 else:
-    print(f"⚠️ Static directory not found: {STATIC_DIR}")
+    print(f"❌ Static folder not found at: {STATIC_DIR}")
 # ----------------------------
 # HELPERS
 # ----------------------------

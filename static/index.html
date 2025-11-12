@@ -14,15 +14,24 @@
 <body>
   <h2>🧠 Multimodal Assistant — Step 2 Demo</h2>
 
-  <div class="col">
-    <!-- Upload Panel -->
-    <div class="panel">
-      <h3>1️⃣ Upload Image</h3>
-      <input id="imgfile" type="file" accept="image/*"/><br/><br/>
-      <button id="uploadBtn">Upload</button>
-      <p id="uploadStatus" class="small"></p>
-      <div id="origImg"></div>
-    </div>
+  <div class="panel">
+  <h3>1️⃣ Upload or Capture Image</h3>
+
+  <!-- File upload -->
+  <input id="imgfile" type="file" accept="image/*" /><br /><br />
+  <button id="uploadBtn">Upload</button>
+
+  <hr />
+
+  <!-- Camera capture -->
+  <video id="camera" width="100%" autoplay style="border:1px solid #ccc;"></video><br />
+  <button id="captureBtn">📸 Capture</button>
+  <canvas id="snapshot" style="display:none;"></canvas>
+
+  <p id="uploadStatus" class="small"></p>
+  <div id="origImg"></div>
+</div>
+
 
     <!-- Ask Panel -->
     <div class="panel">
@@ -63,6 +72,46 @@
   const answerEl = document.getElementById("answer");
   const annotatedEl = document.getElementById("annotated");
   const audioPlayer = document.getElementById("audioPlayer");
+
+  // ---------- CAMERA CAPTURE ----------
+const camera = document.getElementById("camera");
+const captureBtn = document.getElementById("captureBtn");
+const snapshot = document.getElementById("snapshot");
+
+// Request webcam access
+navigator.mediaDevices
+  .getUserMedia({ video: true })
+  .then(stream => {
+    camera.srcObject = stream;
+  })
+  .catch(err => {
+    console.error("Camera access denied:", err);
+  });
+
+// Capture photo and upload it
+captureBtn.onclick = async () => {
+  const ctx = snapshot.getContext("2d");
+  snapshot.width = camera.videoWidth;
+  snapshot.height = camera.videoHeight;
+  ctx.drawImage(camera, 0, 0);
+
+  const blob = await new Promise(resolve => snapshot.toBlob(resolve, "image/jpeg"));
+  const form = new FormData();
+  form.append("file", new File([blob], "captured.jpg", { type: "image/jpeg" }));
+
+  uploadStatus.innerText = "Uploading captured image...";
+  const res = await fetch(backend + "/api/upload_image", { method: "POST", body: form });
+  const j = await res.json();
+
+  if (j.status === "ok") {
+    uploadStatus.innerText = "✅ Captured & Uploaded: " + j.image_id;
+    imageIdInput.value = j.image_id;
+    origImg.innerHTML = `<img src="${backend}/api/image/${j.image_id}" />`;
+  } else {
+    uploadStatus.innerText = "❌ Upload failed: " + (j.message || JSON.stringify(j));
+  }
+};
+
 
   // ---------- IMAGE UPLOAD ----------
   uploadBtn.onclick = async () => {
